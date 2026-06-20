@@ -1,3 +1,8 @@
-./lib
-./REFENCE
-./.vscode
+.DS_Store
+.kiro/
+.vscode/
+REFERENCE/
+lib/
+.gitignore
+.env
+data/

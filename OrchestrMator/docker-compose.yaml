@@ -1,0 +1,150 @@
+version: '3.8'  # Docker Compose file format version
+
+services:
+  postgres:
+    image: postgres:15-alpine                      # Official PostgreSQL 15, Alpine = smaller size
+    container_name: postgres-orchestrmator         # Fixed name for easy reference
+    restart: unless-stopped
+    environment:
+        POSTGRES_USER: orchestrmator_admin         # Database superuser name
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}    # Load from .env file (security!)
+        POSTGRES_DB: orchestrmator_db               # Default database name
+        PGDATA: /var/lib/postgresql/data/pgdata    # Where data lives inside container
+
+    ports:
+      - "5432:5432"                                 # Host:Container - access from your machine
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data                                          # Persist data here
+      - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # Auto-run on first start
+
+    networks:
+      - orchestrmator-network
+  
+    healthcheck:                                      # Check if PostgreSQL is ready
+      test: ["CMD-SHELL", "pg_isready -U orchestrmator_admin -d orchestrmator_db"]
+      interval: 10s                                   # Check every 10 seconds
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-orchestrmator
+    restart: unless-stopped
+    
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - yes
+    # --requirepass: Enable password authentication
+    # --appendonly yes: Enable AOF persistence (data survives restarts)
+    
+    ports:
+      - "6379:6379"
+    
+    volumes:
+      - redis-data:/data                         # Redis saves AOF file here
+    
+    networks:
+      - orchestrmator-network
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq-orchestrmator
+    restart: unless-stopped
+    
+    environment:
+      RABBITMQ_DEFAULT_USER: orchestrmator_admin_mq            # Admin username
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: orchestrmator_vhost          # Virtual host (like a namespace)
+    
+    ports:
+      - "5672:5672"                              # AMQP protocol (your app connects here)
+      - "15672:15672"                            # Management UI (http://localhost:15672)
+    
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq          # Queues/messages persist here
+      - rabbitmq-logs:/var/log/rabbitmq
+    
+    networks:
+      - orchestrmator-network
+    
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-orchestrmator
+    restart: unless-stopped
+    
+    command: server /data --console-address ":9001"
+    # server /data: Start MinIO server with /data as storage
+    # --console-address: Web UI port
+    
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}        # Admin username (like AWS access key)
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}  # Admin password (like AWS secret key)
+    
+    ports:
+      - "9000:9000"                              # S3 API (boto3, aws-cli connect here)
+      - "9001:9001"                              # Web Console (http://localhost:9001)
+    
+    volumes:
+      - minio-data:/data                         # Object storage lives here
+    
+    networks:
+      - orchestrmator-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+
+
+volumes:
+  # PostgreSQL: All database tables, indexes, WAL logs
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres      # Optional: Store on host filesystem
+  
+  # Redis: AOF file, snapshots
+  redis-data:
+    driver: local
+  
+  # RabbitMQ: Queues, messages, exchanges
+  rabbitmq-data:
+    driver: local
+  
+  # RabbitMQ: Operational logs (separate for easy rotation)
+  rabbitmq-logs:
+    driver: local
+  
+  # MinIO: All uploaded files (Excel, CSV, logs)
+  minio-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/minio         # Optional: Store on host filesystem
+
+  
+networks:
+  orchestrmator-network:
+    driver: bridge
+
