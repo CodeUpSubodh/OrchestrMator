@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-psycopg2-binary
 alembic
 celery
 redis
@@ -12,3 +11,6 @@ paramiko
 pytest
 pytest-cov
 hypothesis
+pydantic-settings
+psycopg2-binary
+psycopg[binary]
