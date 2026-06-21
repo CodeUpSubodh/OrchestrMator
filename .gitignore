@@ -6,3 +6,4 @@ lib/
 .gitignore
 .env
 data/
+__pycache__/
