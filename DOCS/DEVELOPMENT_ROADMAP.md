@@ -189,65 +189,101 @@ Create `tests/unit/test_models.py`:
 ### Goal
 Create FastAPI application with authentication and basic CRUD endpoints.
 
-### Tasks
+### 📋 DETAILED SPECIFICATION
+**For complete API contracts, request/response formats, business logic, and implementation guidelines, see:**
+**[PHASE_2_API_GATEWAY_DETAILED.md](./PHASE_2_API_GATEWAY_DETAILED.md)**
+
+This detailed document includes:
+- Full request/response JSON examples for every endpoint
+- Business logic and validation rules
+- Error handling specifications
+- Implementation code snippets
+- Complete integration test suite
+- Tips for working with AI coding assistants
+
+### Tasks Summary
 
 **2.1 Create FastAPI Application**
 
 Create `backend/api_gateway/main.py`:
-- Initialize FastAPI app
-- Configure CORS middleware
-- Add exception handlers
-- Add logging middleware
-- Configure OpenAPI docs
+- Initialize FastAPI app with title, description, version
+- Configure CORS middleware (allow frontend origin)
+- Add exception handlers (RequestValidationError, etc.)
+- Add logging configuration
+- Configure OpenAPI docs at /api/docs
 
-**2.2 Implement Authentication**
+**2.2 Implement Authentication (4 Endpoints)**
 
 Create `backend/api_gateway/auth.py`:
-- JWT token creation/validation
+- JWT token creation/validation functions
 - Password hashing utilities
-- OAuth2 password flow
-- `get_current_user()` dependency
+- OAuth2 password flow configuration
+- `get_current_user()` dependency function
 
 Create endpoints in `backend/api_gateway/routes/auth.py`:
-- `POST /api/v1/auth/register` - Register new user
-- `POST /api/v1/auth/login` - Login and get JWT token
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `GET /api/v1/auth/me` - Get current user info
+- `POST /api/v1/auth/register` - Register new user (validate email, hash password)
+- `POST /api/v1/auth/login` - Login and get JWT tokens (access + refresh)
+- `POST /api/v1/auth/refresh` - Refresh access token using refresh token
+- `GET /api/v1/auth/me` - Get current authenticated user info
 
-**2.3 Implement Activity CRUD**
+**2.3 Implement Activity CRUD (5 Endpoints)**
 
 Create `backend/api_gateway/routes/activities.py`:
-- `GET /api/v1/activities` - List activities (paginated, filtered)
-- `POST /api/v1/activities` - Create activity
+- `GET /api/v1/activities` - List activities (paginated, filter by domain/status/search/creator)
+- `POST /api/v1/activities` - Create activity (validate config structure)
 - `GET /api/v1/activities/{id}` - Get activity details
-- `PUT /api/v1/activities/{id}` - Update activity
-- `DELETE /api/v1/activities/{id}` - Delete/deactivate activity
+- `PUT /api/v1/activities/{id}` - Update activity (check permissions)
+- `DELETE /api/v1/activities/{id}` - Soft-delete activity (set is_active=false)
 
-**2.4 Implement Execution Endpoints**
+**Config Validation:** Ensure config has `commands` array, `authentication` object, and `state_data_map`.
+
+**2.4 Implement Execution Endpoints (5 Endpoints)**
 
 Create `backend/api_gateway/routes/executions.py`:
-- `POST /api/v1/executions` - Start execution (validate input)
-- `GET /api/v1/executions` - List executions
-- `GET /api/v1/executions/{id}` - Get execution details
-- `GET /api/v1/executions/{id}/results` - Get results
-- `DELETE /api/v1/executions/{id}` - Cancel execution
+- `POST /api/v1/executions` - Start execution (validate input_data with nodes array, set status=queued)
+- `GET /api/v1/executions` - List executions (filter by activity/status/CR ID/date range)
+- `GET /api/v1/executions/{id}` - Get execution details with statistics
+- `GET /api/v1/executions/{id}/results` - Get node results with optional command details
+- `DELETE /api/v1/executions/{id}` - Cancel execution (only if queued or running)
 
-**2.5 Add Health Check**
+**Input Validation:** Each node must have `node_name` and `node_ip`. Validate IP format.
+
+**2.5 Add Health Check (3 Endpoints)**
 
 Create `backend/api_gateway/routes/health.py`:
-- `GET /health` - Basic health check
-- `GET /health/ready` - Readiness check (DB connection)
-- `GET /health/live` - Liveness check
+- `GET /health` - Basic health check (always 200 if running)
+- `GET /health/ready` - Readiness check (test DB/Redis/RabbitMQ connections)
+- `GET /health/live` - Liveness check (for Kubernetes pod restart logic)
 
 **2.6 Write Integration Tests**
 
 Create `tests/integration/test_api.py`:
-- Test authentication flow
-- Test activity CRUD operations
-- Test execution creation
-- Test error handling
+- Test authentication flow (register → login → get user)
+- Test duplicate email registration (409 error)
+- Test wrong password login (401 error)
+- Test activity CRUD operations (create → get → update → list → delete)
+- Test execution creation and listing
+- Test unauthorized access (401 without token)
+- Test invalid token (401 with bad token)
+- Test permission checks (403 when updating others' activities)
 
-**Checkpoint**: Can you create activities and start executions via API?
+**Use pytest with TestClient and SQLite in-memory database for isolated tests.**
+
+**Checkpoint**: Can you create activities and start executions via API? Do all 17 endpoints work correctly?
+
+### API Summary
+
+**Total Endpoints: 17**
+- Authentication: 4 endpoints
+- Activities: 5 endpoints
+- Executions: 5 endpoints  
+- Health: 3 endpoints
+
+### Testing Strategy
+
+Run tests with: `pytest tests/integration/test_api.py -v --cov=backend`
+
+Target: 80%+ code coverage for all API routes.
 
 ---
 
