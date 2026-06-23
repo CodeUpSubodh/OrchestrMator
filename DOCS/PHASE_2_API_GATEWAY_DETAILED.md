@@ -6,6 +6,51 @@ This document provides comprehensive API contracts, business logic, and implemen
 
 ---
 
+## Multi-Entry Point Architecture
+
+OrchestrMator uses **multiple entry points** for different services:
+
+```
+backend/
+├── main.py                          # 🎯 Service Orchestrator (CLI)
+│                                    #    Launches: api, worker, beat, all
+│
+├── api_gateway/
+│   ├── main.py                      # 🚀 FastAPI App (This Phase)
+│   ├── auth.py                      # JWT utilities
+│   └── routes/
+│       ├── auth.py                  # /api/v1/auth/*
+│       ├── activities.py            # /api/v1/activities/*
+│       ├── executions.py            # /api/v1/executions/*
+│       └── health.py                # /health/*
+│
+├── workflow_engine/                 # Phase 3
+│   └── main.py                      # 🚀 Celery Worker
+│
+├── scheduler/                       # Phase 7
+│   └── main.py                      # 🚀 Celery Beat
+│
+├── models/                          # Shared
+├── schemas/                         # Shared
+└── shared/                          # Shared
+```
+
+### How to Run
+
+```bash
+# Option 1: Using orchestrator (recommended)
+python -m backend.main api                    # Start API Gateway
+python -m backend.main api --port 8080        # Custom port
+
+# Option 2: Direct uvicorn
+uvicorn backend.api_gateway.main:app --reload
+
+# Option 3: Production
+uvicorn backend.api_gateway.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+---
+
 ## Architecture Overview
 
 ```
@@ -30,6 +75,27 @@ This document provides comprehensive API contracts, business logic, and implemen
 │  - Execution Model                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Task 2.0: Create Service Orchestrator (Optional)
+
+### File: `backend/main.py`
+
+**Purpose:** CLI tool to launch different OrchestrMator services
+
+**Functionality:**
+- Launch API Gateway: `python -m backend.main api`
+- Launch Celery Worker: `python -m backend.main worker` (Phase 3)
+- Launch Celery Beat: `python -m backend.main beat` (Phase 7)
+- Launch All: `python -m backend.main all` (development)
+
+**Key Features:**
+- Argument parsing (service type, port, host, concurrency)
+- Subprocess management
+- Graceful shutdown handling
+
+**Note:** This is optional. You can also run services directly with uvicorn/celery commands.
 
 ---
 

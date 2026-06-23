@@ -9,6 +9,41 @@ This document provides a **complete step-by-step guide** to build OrchestrMator 
 
 ---
 
+## Architecture: Multi-Entry Point Design
+
+OrchestrMator uses a **microservices-ready architecture** with multiple entry points:
+
+```
+backend/
+├── main.py                      # 🎯 Service Orchestrator (CLI launcher)
+├── api_gateway/
+│   └── main.py                  # 🚀 FastAPI REST API Service
+├── workflow_engine/
+│   └── main.py                  # 🚀 Celery Worker Service (Phase 3)
+├── scheduler/
+│   └── main.py                  # 🚀 Celery Beat Service (Phase 7)
+├── models/                      # Shared database models
+├── schemas/                     # Shared Pydantic schemas
+└── shared/                      # Shared utilities
+```
+
+### Entry Points Explained
+
+| File | Purpose | Run Command |
+|------|---------|-------------|
+| `backend/main.py` | CLI tool to launch any service | `python -m backend.main api` |
+| `backend/api_gateway/main.py` | FastAPI REST API application | `uvicorn backend.api_gateway.main:app` |
+| `backend/workflow_engine/main.py` | Celery worker process | `celery -A backend.workflow_engine worker` |
+| `backend/scheduler/main.py` | Celery beat scheduler | `celery -A backend.scheduler beat` |
+
+**Why This Design?**
+- **Flexibility**: Each service can run independently or together
+- **Scalability**: Scale API and workers separately
+- **Development**: Run only what you need during development
+- **Production**: Deploy services as separate containers
+
+---
+
 ## Prerequisites
 
 Before starting development:
@@ -189,6 +224,11 @@ Create `tests/unit/test_models.py`:
 ### Goal
 Create FastAPI application with authentication and basic CRUD endpoints.
 
+### Architecture Note
+In this phase, we build the **API Gateway service** which is one of the entry points:
+- `backend/api_gateway/main.py` - The FastAPI application
+- `backend/main.py` - CLI orchestrator to launch services (can start API with `python -m backend.main api`)
+
 ### 📋 DETAILED SPECIFICATION
 **For complete API contracts, request/response formats, business logic, and implementation guidelines, see:**
 **[PHASE_2_API_GATEWAY_DETAILED.md](./PHASE_2_API_GATEWAY_DETAILED.md)**
@@ -203,6 +243,24 @@ This detailed document includes:
 
 ### Tasks Summary
 
+**2.0 Create Service Orchestrator (Optional)**
+
+Create `backend/main.py`:
+- CLI tool to launch different services (api, worker, beat, all)
+- Accept arguments: `--host`, `--port`, `--concurrency`, etc.
+- Use subprocess to run: `uvicorn backend.api_gateway.main:app`
+- Support development mode: run all services in parallel
+
+**Run Commands:**
+```bash
+# Using orchestrator
+python -m backend.main api              # Start API only
+python -m backend.main api --port 8080  # API on custom port
+
+# Direct uvicorn
+uvicorn backend.api_gateway.main:app --reload
+```
+
 **2.1 Create FastAPI Application**
 
 Create `backend/api_gateway/main.py`:
@@ -211,6 +269,7 @@ Create `backend/api_gateway/main.py`:
 - Add exception handlers (RequestValidationError, etc.)
 - Add logging configuration
 - Configure OpenAPI docs at /api/docs
+- **DO NOT** create routes here - routes go in separate files
 
 **2.2 Implement Authentication (4 Endpoints)**
 
